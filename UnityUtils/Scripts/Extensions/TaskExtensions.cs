@@ -40,5 +40,35 @@ namespace UnityUtils {
                 onException(exception);
             }
         }
+        
+        /// <summary>
+        /// Repeatedly polls a condition until it returns true or a timeout occurs.
+        /// </summary>
+        /// <param name="condition">The condition to evaluate.</param>
+        /// <param name="timeoutMs">Maximum time to wait in milliseconds. Use -1 for no timeout.</param>
+        /// <param name="pollIntervalMs">Time between condition checks in milliseconds. Default is 33ms (≈ one frame at 30 FPS).</param>
+        /// <returns>True if the condition was met; false if the timeout was reached.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when condition is null.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when pollIntervalMs is not positive.</exception>
+        public static async Task<bool> WaitUntil(this Func<bool> condition, int timeoutMs = -1, int pollIntervalMs = 33) {
+            if (condition == null) throw new ArgumentNullException(nameof(condition));
+            if (pollIntervalMs <= 0) throw new ArgumentOutOfRangeException(nameof(pollIntervalMs), "Poll interval must be positive");
+        
+            var waitTask = RunWaitLoop(condition, pollIntervalMs);
+
+            if (timeoutMs < 0) {
+                await waitTask;
+                return true;
+            }
+        
+            var timeoutTask = Task.Delay(timeoutMs);
+            var finished = await Task.WhenAny(waitTask, timeoutTask);
+            return finished == waitTask;
+        }
+
+        static async Task RunWaitLoop(Func<bool> condition, int pollIntervalMs) {
+            while (!condition())
+                await Task.Delay(pollIntervalMs).ConfigureAwait(false);
+        }
     }
 }
